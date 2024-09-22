@@ -4,12 +4,13 @@ const { RedisVectorStore } = require('@langchain/redis');
 const { Document } = require('@langchain/core/documents');
 const axios = require('axios');
 const fs = require("fs");
+require('dotenv').config();
 
 
 async function initializeRedis() {
   return new Promise((resolve, reject) => {
     client = createClient({
-      url: 'redis://localhost:6379',
+      url: process.env.REDIS_URL,
       socket: {
         connectTimeout: 10000  // Optional: Customize the connection timeout (10 seconds)
       }
@@ -30,18 +31,18 @@ async function initializeRedis() {
   });
 }
 
-async function createIndex() {
-    await client.ft.create('embeddingIdx', {
-        '$.embedding': {
-            type: 'VECTOR',
-            ALGORITHM: 'HNSW',
-            M: 16,
-            EF_CONSTRUCTION: 200,
-            EF_RUNTIME: 10,
-            DIM: 4096,  //1536 Dimension of OpenAI embeddings
-        },
-    });
-}
+//async function createIndex() {
+//    await client.ft.create('embeddingIdx', {
+//        '$.embedding': {
+//            type: 'VECTOR',
+//            ALGORITHM: 'HNSW',
+//            M: 16,
+//            EF_CONSTRUCTION: 200,
+//            EF_RUNTIME: 10,
+//            DIM: 4096,  //1536 Dimension of OpenAI embeddings
+//        },
+//    });
+//}
 
 async function getDocuments() {
     return new Promise((resolve, reject) => {
@@ -118,8 +119,8 @@ async function deleteKeysByPattern(pattern) {
     }
 
     const embeddings = new OllamaEmbeddings({
-        model: "llama3",
-        baseUrl: "http://localhost:11434",
+        model: process.env.MODEL_NAME,
+        baseUrl: process.env.OLLAMA_URL,
 
     });
 
@@ -148,9 +149,9 @@ async function deleteKeysByPattern(pattern) {
 
         // Generate response using the LLaMA model via Ollama API
         try {
-            const response = await axios.post(`http://localhost:11434/api/generate`, {
+            const response = await axios.post(`${process.env.OLLAMA_URL}/api/generate`, {
                 prompt: responsePrompt,
-                model: 'llama3', // Specify your model here
+                model: process.env.MODEL_NAME, // Specify your model here
                 max_tokens: 150, // Adjust as needed
                 stream: false
             });
