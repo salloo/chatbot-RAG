@@ -1,0 +1,26 @@
+{
+  "name": "chatbot",
+  "version": "1.0.0",
+  "description": "chatbot ai",
+  "main": "chatbot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chatbot",
+    "openai"
+  ],
+  "author": "salman shahid",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/core": "^0.3.3",
+    "@langchain/ollama": "^0.1.0",
+    "@langchain/openai": "^0.3.0",
+    "@langchain/redis": "^0.1.0",
+    "axios": "^1.7.7",
+    "langchain": "^0.3.2",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.62.1",
+    "redis": "^4.7.0"
+  }
+}
