@@ -1,14 +1,10 @@
-//const { OpenAIEmbeddings } = require('@langchain/openai');
-const { ChatOllama, OllamaEmbeddings } = require("@langchain/ollama");
+const { OllamaEmbeddings } = require("@langchain/ollama");
 const { createClient } = require('redis');
 const { RedisVectorStore } = require('@langchain/redis');
 const { Document } = require('@langchain/core/documents');
-//const { promisify } = require('util');
-//const { Configuration, OpenAIApi } = require('openai');
 const axios = require('axios');
 const fs = require("fs");
 
-//const openAIKey = 'sk-2OwcxpW562xw2NUogHS51Leer4EZAogQvPQTq0ayYDT3BlbkFJE86cbWLFbTVbj--djrw12bYBFpcGjFpm6PXHA62scA';
 
 async function initializeRedis() {
   return new Promise((resolve, reject) => {
