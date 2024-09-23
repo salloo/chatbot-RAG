@@ -96,7 +96,7 @@ async function getDocuments() {
                     let d = docs[i];
                     documents.push(new Document({
                         id: i,
-                        metadata: { title: d.title },
+                        metadata: { title: d.title, url: d.url },
                         pageContent: d.content,
                     }));
                 } 
@@ -115,6 +115,8 @@ async function queryModel(query) {
     const results = await vectorStore.similaritySearch(query, 3);
 
     if (results.length > 0) {
+
+        results.map(r => console.log(r.metadata.title));
         const context = results.map(result => result.pageContent).join("\n");
 
         // Generate a response using the LLaMA model (assumed to be available through Ollama)
@@ -125,7 +127,7 @@ async function queryModel(query) {
             const response = await axios.post(`${process.env.OLLAMA_URL}/api/generate`, {
                 prompt: responsePrompt,
                 model: process.env.MODEL_NAME, // Specify your model here
-                max_tokens: 150, // Adjust as needed
+                max_tokens: 500, // Adjust as needed
                 stream: false
             });
 
