@@ -7,7 +7,15 @@ const fs = require("fs");
 const express = require('express');
 require('dotenv').config();
 
+// TODO: Improvements
+// Document file loaders / PDF / unstructured / html (https://python.langchain.com/docs/integrations/document_loaders/unstructured_file)
+// Text splitters  (https://python.langchain.com/docs/modules/data_connection/document_transformers/text_splitters/recursive_text_splitter)
+// Prompt engineering
+// Remember user session
+// Dockerize 
+
 let vectorStore = null;
+const knn = 3;
 
 // Create an Express app
 const app = express();
@@ -39,6 +47,8 @@ app.listen(port, async () => {
     
     console.log(`Server running on port ${port}`);
 });
+
+// ----------------------------Chatbot functions-----------------------------------//
 
 async function reindexDB() {
     await deleteKeysByPattern('doc:*');
@@ -112,10 +122,11 @@ async function queryModel(query) {
 
     console.log(`searching store for: ${query}`);
 
-    const results = await vectorStore.similaritySearch(query, 3);
+    const results = await vectorStore.similaritySearch(query, knn);
 
     if (results.length > 0) {
 
+        console.log("\nmatched docs\n:");
         results.map(r => console.log(r.metadata.title));
         const context = results.map(result => result.pageContent).join("\n");
 
