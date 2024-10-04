@@ -2,6 +2,7 @@ const { OllamaEmbeddings } = require("@langchain/ollama");
 const { createClient } = require('redis');
 const { RedisVectorStore } = require('@langchain/redis');
 const { Document } = require('@langchain/core/documents');
+const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
 const axios = require('axios');
 const fs = require("fs");
 const express = require('express');
@@ -32,12 +33,47 @@ app.get('/api/reindex', async (req, res) => {
 });
 
 // Example API route that returns some data
+
 app.post('/api/chat', async (req, res) => {
 
     const body = req.body;
     let response = await queryModel(body.query);
 
     res.json({ success: true, data: {message: response} });
+});
+
+app.get('/api/chatstream', async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const q = req.query;
+
+    if (q === undefined || q === '' || q === null) {
+        return res.status(400).send("missing query");
+    }
+
+    // Use this function to send chunks of data to the client
+    const sendChunk = (chunk) => {
+        //const j = JSON.parse(chunk);
+        //console.log(j.response);
+        res.write(`data: ${chunk}\n\n`);
+    };
+
+    try {
+        const generator =  queryModelStream(q.query);
+        for await (const token of generator) {
+            sendChunk(token);
+        }
+
+        // Once done, close the stream
+        res.write('event: close\ndata: [DONE]\n\n');
+        res.end();
+    } catch(error) {
+        console.error('Error:', error);
+        res.status(500).send('Error occurred during streaming');
+    }
+
 });
 
 // Start the server
@@ -52,7 +88,7 @@ app.listen(port, async () => {
 
 async function reindexDB() {
     await deleteKeysByPattern('doc:*');
-    docs = await getDocuments();
+    const docs = await getDocuments();
 
     const embeddings = new OllamaEmbeddings({
         model: process.env.MODEL_NAME,
@@ -92,6 +128,12 @@ async function initializeRedis() {
   });
 }
 
+async function loadDocuments() {
+    return new Promise((resolve, reject) => {
+
+    });
+}
+
 async function getDocuments() {
     return new Promise((resolve, reject) => {
         fs.readFile("./docs.json", 'utf8', (err, data) => {
@@ -116,6 +158,35 @@ async function getDocuments() {
             }
         });
     });
+}
+
+async function* queryModelStream(query) {
+
+    console.log(`searching store for: ${query}`);
+
+    const results = await vectorStore.similaritySearch(query, knn);
+
+    if (results.length > 0) {
+
+        console.log("\nmatched docs\n:");
+        results.map(r => console.log(r.metadata.title));
+        const context = results.map(result => result.pageContent).join("\n");
+
+        // Generate a response using the LLaMA model (assumed to be available through Ollama)
+        const responsePrompt = `Based on the following information:\n${context}\n\nAnswer this question: ${query}`;
+
+        // Generate response using the LLaMA model via Ollama API
+        const response = await axios.post(`${process.env.OLLAMA_URL}/api/generate`, {
+            prompt: responsePrompt,
+            model: process.env.MODEL_NAME, // Specify your model here
+            max_tokens: 300, // Adjust as needed
+            stream: true
+        });
+
+        const tokens =  response.data;
+
+        yield tokens;
+    }
 }
 
 async function queryModel(query) {
@@ -148,9 +219,11 @@ async function queryModel(query) {
             console.error(error);
             return "Error generating response:", error;
         }
-        
-    } else {
-        return "No relevant documents found.";
+
+        const response_text = response.data.response;
+        return response_text;
+    }else {
+        return "No relevant documents found";
     }
 }
 
