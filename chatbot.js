@@ -6,6 +6,8 @@ const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
 const axios = require('axios');
 const fs = require("fs");
 const express = require('express');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocs = require('./swagger'); // Import the Swagger
 require('dotenv').config();
 
 // TODO: Improvements
@@ -27,13 +29,40 @@ app.use(express.json());
 // Define a port (you can use an environment variable or a default value)
 const port = process.env.PORT || 3000;
 
+
+// Serve Swagger API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerDocs); // Assuming swaggerDocument contains your Swagger spec
+});
+
+
+/**
+ * @swagger
+ * /api/reindex:
+ *   get:
+ *     summary: Reindex all the documents
+ *     responses:
+ *       200:
+ *         description: 200 OK response
+ */
 app.get('/api/reindex', async (req, res) => {
     await reindexDB();
     res.json({ success: true, data: {message: 'reindexed'} });
 });
 
-// Example API route that returns some data
 
+/**
+ * @swagger
+ * /api/chat:
+ *   post:
+ *     summary: Chat api
+ *     responses:
+ *       200:
+ *         description: 200 OK response
+ */
 app.post('/api/chat', async (req, res) => {
 
     const body = req.body;
@@ -42,6 +71,16 @@ app.post('/api/chat', async (req, res) => {
     res.json({ success: true, data: {message: response} });
 });
 
+/**
+ * @swagger
+ * /api/chatstream:
+ *   get:
+ *     summary: Streams chats responses
+ *
+ *     responses:
+ *       200:
+ *         description: 200 OK response
+ */
 app.get('/api/chatstream', async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
