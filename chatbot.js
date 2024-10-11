@@ -2,7 +2,7 @@ const { OllamaEmbeddings } = require("@langchain/ollama");
 const { createClient } = require('redis');
 const { RedisVectorStore } = require('@langchain/redis');
 const { Document } = require('@langchain/core/documents');
-const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
+//const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
 const axios = require('axios');
 const fs = require("fs");
 const express = require('express');
@@ -118,8 +118,12 @@ app.get('/api/chatstream', async (req, res) => {
 // Start the server
 app.listen(port, async () => {
     await initializeRedis();
-    await reindexDB();
     
+    console.log('redis init done');
+    
+    await reindexDB();
+
+    console.log('reindexing done');
     console.log(`Server running on port ${port}`);
 });
 
@@ -129,10 +133,14 @@ async function reindexDB() {
     await deleteKeysByPattern('doc:*');
     const docs = await getDocuments();
 
+    console.log('creating ollama embeddings with url: ' + process.env.OLLAMA_URL);
+    
     const embeddings = new OllamaEmbeddings({
         model: process.env.MODEL_NAME,
         baseUrl: process.env.OLLAMA_URL,
     });
+
+    console.log('creating documents from articles');
 
     vectorStore = await RedisVectorStore.fromDocuments(
         docs,
@@ -144,47 +152,51 @@ async function reindexDB() {
 }
 
 async function initializeRedis() {
-  return new Promise((resolve, reject) => {
-    client = createClient({
-      url: process.env.REDIS_URL,
-      socket: {
-        connectTimeout: 10000  // Optional: Customize the connection timeout (10 seconds)
-      }
-    });
-
-    // Handle Redis connection events
-    client.on('connect', () => {
-      console.log('Redis client connected');
-      resolve(client);
-    });
-
-    client.on('error', (err) => {
-      console.error('Redis error: ', err);
-      reject(err);
-    });
-
-    client.connect();  // Initiates the connection
-  });
-}
-
-async function loadDocuments() {
     return new Promise((resolve, reject) => {
+        client = createClient({
+            url: process.env.REDIS_URL,
+            //host: process.env.REDIS_HOST || 'localhost',
+            //port: 6379,
+            socket: {
+                connectTimeout: 10000 
+            }
+        });
 
+        // Handle Redis connection events
+        client.on('connect', () => {
+            console.log('Redis client connected');
+            resolve(client);
+        });
+
+        client.on('error', (err) => {
+            console.error('Redis error: ', err);
+            reject(err);
+        });
+
+        client.connect();  // Initiates the connection
     });
 }
+
+//async function loadDocuments() {
+//    return new Promise((resolve, reject) => {
+//
+//    });
+//}
 
 async function getDocuments() {
     return new Promise((resolve, reject) => {
         fs.readFile("./docs.json", 'utf8', (err, data) => {
+            console.log('reading documents');
             if (err) {
                 return reject(err); // Reject the promise if there's an error
             }
             try {
                 let documents = [];
                 let docs = JSON.parse(data); // Parse JSON data
-                
+
                 for (let i = 0; i < docs.length; i++) {
                     let d = docs[i];
+                    console.log('reading doc id: ' + i);
                     documents.push(new Document({
                         id: i,
                         metadata: { title: d.title, url: d.url },
@@ -267,33 +279,33 @@ async function queryModel(query) {
 }
 
 async function deleteKeysByPattern(pattern) {
-  try {
-    let cursor = '0'; // Initial cursor value for SCAN
-    const keysToDelete = [];
+    try {
+        let cursor = '0'; // Initial cursor value for SCAN
+        const keysToDelete = [];
 
-    // Use SCAN to find keys matching the pattern
-    //do {
-      const result = await client.scan(cursor, {
-        MATCH: pattern,  // Pattern to match (e.g., prefix*)
-        COUNT: 1000      // Number of keys to scan at once
-      });
+        // Use SCAN to find keys matching the pattern
+        //do {
+        const result = await client.scan(cursor, {
+            MATCH: pattern,  // Pattern to match (e.g., prefix*)
+            COUNT: 1000      // Number of keys to scan at once
+        });
 
-      cursor = result.cursor;   // Update the cursor
-      const keys = result.keys; // Get matching keys
+        cursor = result.cursor;   // Update the cursor
+        const keys = result.keys; // Get matching keys
 
-      if (keys.length > 0) {
-        keysToDelete.push(...keys);
-      }
-    //} while (cursor !== '0'); // Continue scanning until cursor is 0
+        if (keys.length > 0) {
+            keysToDelete.push(...keys);
+        }
+        //} while (cursor !== '0'); // Continue scanning until cursor is 0
 
-    // If there are keys to delete, use DEL or UNLINK
-    if (keysToDelete.length > 0) {
-      console.log(`Deleting ${keysToDelete.length} keys matching ${pattern}`);
-      await client.del(keysToDelete); // You can use redisClient.unlink for non-blocking delete
-    } else {
-      console.log(`No keys found matching pattern: ${pattern}`);
+        // If there are keys to delete, use DEL or UNLINK
+        if (keysToDelete.length > 0) {
+            console.log(`Deleting ${keysToDelete.length} keys matching ${pattern}`);
+            await client.del(keysToDelete); // You can use redisClient.unlink for non-blocking delete
+        } else {
+            console.log(`No keys found matching pattern: ${pattern}`);
+        }
+    } catch (error) {
+        console.error('Error deleting keys:', error);
     }
-  } catch (error) {
-    console.error('Error deleting keys:', error);
-  }
 }

@@ -1,0 +1,33 @@
+services:
+  ollama:
+    image: ollama/ollama:latest  # Use the latest Ollama image
+    container_name: ollama
+    ports:
+      - "11434:11434"  # Expose port 11434 for API access
+    volumes:
+      - ./ollama_volume:/root/.ollama  # Mount the persistent volume for Ollama
+    restart: unless-stopped  # Restart policy for the container
+    entrypoint: ["sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
+
+  redis:
+    image: redis/redis-stack-server:latest  # Use the latest Redis Stack image
+    container_name: redis_stack
+    ports:
+      - "6379:6379"  # Expose port 6379 for Redis
+    volumes:
+      - redis_data:/data  # Mount a volume for persistent data in Redis
+    restart: unless-stopped  # Restart policy for the container
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_HOST=host.docker.internal
+    depends_on:
+    - redis
+    - ollama
+
+volumes:
+  ollama_volume: {}  
+  redis_data: {}     
